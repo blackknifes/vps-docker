@@ -1,0 +1,23 @@
+{
+  "name": "x-manager-server",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "cross-env mode=production webpack --color --progress",
+    "watch": "cross-env mode=development webpack --color --progress --watch"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.18.6",
+    "babel-loader": "^8.2.5",
+    "cross-env": "^7.0.3",
+    "webpack": "^5.73.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-node-externals": "^3.0.0"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "express": "^4.18.1",
+    "nedb-promises": "^6.1.0"
+  }
+}

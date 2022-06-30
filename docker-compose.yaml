@@ -2,7 +2,7 @@ version: '3'
 services:
   #nginx反向代理
   nginx:
-    container_name: nginx
+    container_name: bknife-nginx
     image: nginx
     volumes:
       - /etc/nginx:/etc/nginx
@@ -16,7 +16,7 @@ services:
 
   #xray管理页面
   x-ui:
-    container_name: x-ui
+    container_name: bknife-xray
     image: enwaiax/x-ui
     volumes:
       - /etc/x-ui:/etc/x-ui
@@ -28,10 +28,10 @@ services:
       - bknife
     depends_on:
       - nginx
-  
+
   #docker管理器
   portainer:
-    container_name: portainer
+    container_name: bknife-portainer
     image: portainer/portainer-ce
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
