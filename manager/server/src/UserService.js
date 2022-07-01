@@ -1,7 +1,8 @@
-import nedb from "nedb-promises";
+import Database from "./Database";
 import crypto from "crypto";
 import ExpressApp from "./ExpressApp";
 import Result from "./Result";
+
 
 function sha256(value) {
     let digest = crypto.createHash("sha256");
@@ -17,20 +18,31 @@ function genSalt() {
 }
 
 class UserService {
-    /**@type {nedb} */
+    /**@type {Database.Mapper} */
     db;
 
     /**
      * 
-     * @param {nedb} db 
+     * @param {Database} db 
      */
     constructor(db) {
-        this.db = db;
+        this.db = db.createMapper("user");
+        (async () => {
+            let user = await this.db.get({ username: "admin" });
+            if (!user) {
+                user = { username: "admin" };
+                user.salt = genSalt();
+                user.password = sha256("admin" + user.salt);
+                user.realname = "管理员";
+                user.status = 1;
+                await this.db.insert(user);
+            }
+        })();
     }
 
     /**
      * 
-     * @param {{username: string, password: string, realname: string, phone: string, sex?: number, email?: string}} user 
+     * @param {{username: string, password: string, realname: string, phone?: string, sex?: number, email?: string}} user 
      */
     async register(user) {
         let session = ExpressApp.session;
@@ -40,17 +52,17 @@ class UserService {
             return Result.fail("password参数格式错误");
         if (!user.realname || user.realname.length > 16)
             return Result.fail("realname参数格式错误");
-        if (!user.realname || !/$[1-9][0-9]{10}/g.test(user.phone))
+        if (user.phone && !/^(\+\d\d)?[1-9]\d{10}$/g.test(user.phone))
             return Result.fail("phone参数格式错误");
 
-        let userDb = await this.db.findOne({ table: "user", username })
+        let userDb = await this.db.get({ username: user.username })
         if (userDb)
             return Result.fail("用户名已存在");
         user.table = "user";
         user.salt = genSalt();
         user.password = sha256(user.password + user.salt);
+        user.status = 1;
         await this.db.insert(user);
-        user.status = true;
         session.user = user;
         return Result.ok();
     }
@@ -62,49 +74,60 @@ class UserService {
      * @param {string} salt 
      * @returns 
      */
-    async login(username, password, salt) {
+    async login(username, password) {
         let session = ExpressApp.session;
         if (session.user)
             return Result.fail("用户已登录");
-        let user = await this.db.findOne({ table: "user", username })
+        let user = await this.db.get({ username })
         if (!user)
             return Result.fail("用户不存在");
-        let encodedPwd = sha256(password + salt);
+        if (user.status === 0)
+            return Result.fail("该用户已被禁用");
 
+        let encodedPwd = sha256(password + user.salt);
         if (encodedPwd != user.password)
             return Result.fail("密码错误");
+
+        user.id = user._id;
         delete user.password;
         delete user.salt;
+        delete user._id;
+
         session.user = user;
         return Result.ok(user)
     }
 
     /**
      * 启用用户
-     * @param {string} username 
+     * @param {{username: string, password?: string, realname?: string, phone?: string, sex?: number, email?: string, status?: number}} user 
      * @returns 
      */
-    async enable(username) {
+    async update(user) {
         let session = ExpressApp.session;
-        if (!session.user || session.user.username != "admin")
+        if (!session.user || (session.user.username != "admin" && session.user.username != user.username))
             return Result.forbid("没有权限");
-        let user = await this.db.findOne({ table: "user", username })
-        user.status = 1;
-        await this.db.insert();
-    }
 
-    /**
-     * 禁用用户
-     * @param {string} username 
-     * @returns 
-     */
-     async enable(username) {
-        let session = ExpressApp.session;
-        if (!session.user || session.user.username != "admin")
-            return Result.forbid("没有权限");
-        let user = await this.db.findOne({ table: "user", username })
-        user.status = 0;
-        await this.db.insert();
+        let query = { username: user.username };
+        let updater = {};
+        if (user.password) {
+            let userDB = await this.db.get({ username: user.username })
+            if (!userDB)
+                return Result.fail("该用户不存在");
+            updater.password = sha256(user.password + userDB.salt);
+        }
+        if (user.realname)
+            updater.realname = user.realname;
+        if (user.phone)
+            updater.phone = user.phone;
+        if (user.sex)
+            updater.sex = user.sex;
+        if (user.email)
+            updater.email = user.email;
+        if (typeof user.status !== "undefined")
+            updater.status = user.status;
+        let num = await this.db.update(query, { $set: updater });
+        if (num == 0)
+            return Result.fail("用户不存在");
     }
 }
 

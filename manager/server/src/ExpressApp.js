@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from "express";
 import Result from "./Result";
 import process from "process";
 import cookieParser from "cookie-parser";
+import bodyParser from "body-parser";
 
 function makeSessoinId() {
     let buf = Buffer.allocUnsafe(16);
@@ -100,6 +101,8 @@ class ExpressApp {
     constructor() {
         this.app = express();
         this.app.use(cookieParser());
+        this.app.use(bodyParser.urlencoded({ extended: false }));
+        this.app.use(bodyParser.json());
     }
 
     /**
@@ -117,7 +120,7 @@ class ExpressApp {
      * @param {HttpHandler} cb 
      */
     post(url, cb) {
-        this.app.get(url, callback.bind(this, cb));
+        this.app.post(url, callback.bind(this, cb));
     }
 
     /**
